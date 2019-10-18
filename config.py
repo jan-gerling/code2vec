@@ -5,13 +5,14 @@ from argparse import ArgumentParser
 import sys
 import os
 
-
 class Config:
     @classmethod
     def arguments_parser(cls) -> ArgumentParser:
         parser = ArgumentParser()
         parser.add_argument("-d", "--data", dest="data_path",
                             help="path to preprocessed dataset", required=False)
+        parser.add_argument("--inputData", dest="input_data_path",
+                            help="path to input dataset", metavar="FILE", required=False)
         parser.add_argument("-te", "--test", dest="test_path",
                             help="path to test file", metavar="FILE", required=False)
         parser.add_argument("-s", "--save", dest="save_path",
@@ -33,6 +34,8 @@ class Config:
                                  'size.')
         parser.add_argument('--predict', action='store_true',
                             help='execute the interactive prediction shell')
+        parser.add_argument('--representation', action='store_true',
+                            help='extract the code2vec representation of the source code')
         parser.add_argument("-fw", "--framework", dest="dl_framework", choices=['keras', 'tensorflow'],
                             default='tensorflow', help="deep learning framework to use.")
         parser.add_argument("-v", "--verbose", dest="verbose_mode", type=int, required=False, default=1,
@@ -73,6 +76,8 @@ class Config:
         args = self.arguments_parser().parse_args()
         # Automatically filled, do not edit:
         self.PREDICT = args.predict
+        self.REPRESENTATION = args.representation
+        self.INPUT_DATA_PATH = args.input_data_path
         self.MODEL_SAVE_PATH = args.save_path
         self.MODEL_LOAD_PATH = args.load_path
         self.TRAIN_DATA_PATH_PREFIX = args.data_path
@@ -114,6 +119,8 @@ class Config:
 
         # Automatically filled by `args`.
         self.PREDICT: bool = False   # TODO: update README;
+        self.REPRESENTATION: bool = False
+        self.INPUT_DATA_PATH: Optional[str] = "Input.java"
         self.MODEL_SAVE_PATH: Optional[str] = None
         self.MODEL_LOAD_PATH: Optional[str] = None
         self.TRAIN_DATA_PATH_PREFIX: Optional[str] = None
@@ -149,6 +156,23 @@ class Config:
     @property
     def is_training(self) -> bool:
         return bool(self.TRAIN_DATA_PATH_PREFIX)
+
+    @property
+    def input_data_is_file(self) -> bool:
+        return self.INPUT_DATA_PATH and os.path.isfile(self.INPUT_DATA_PATH)
+
+    @property
+    def input_data_is_java_file(self) -> bool:
+        return self.INPUT_DATA_PATH and os.path.isfile(self.INPUT_DATA_PATH) and self.INPUT_DATA_PATH.endswith(".java")
+
+    @property
+    def input_data_type(self) -> str:
+        if self.input_data_is_java_file:
+            return "--file"
+        elif self.input_data_is_file:
+            return "--processed"
+        else:
+            return "--dir"
 
     @property
     def is_loading(self) -> bool:

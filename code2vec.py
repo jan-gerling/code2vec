@@ -18,7 +18,6 @@ if __name__ == '__main__':
 
     model = load_model_dynamically(config)
     config.log('Done creating code2vec model')
-
     if config.is_training:
         model.train()
     if config.SAVE_W2V is not None:
@@ -32,7 +31,12 @@ if __name__ == '__main__':
         if eval_results is not None:
             config.log(
                 str(eval_results).replace('topk', 'top{}'.format(config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION)))
+
+    if config.REPRESENTATION:
+        predictor = InteractivePredictor(config, model)
+        predictor.extractRepresentation(config.input_data_type, config.INPUT_DATA_PATH)
+
     if config.PREDICT:
         predictor = InteractivePredictor(config, model)
-        predictor.predict()
+        predictor.predict(config.input_data_type, config.INPUT_DATA_PATH)
     model.close_session()

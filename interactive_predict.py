@@ -3,6 +3,7 @@ import traceback
 from common import common
 from extractor import Extractor
 
+
 SHOW_TOP_CONTEXTS = 10
 MAX_PATH_LENGTH = 8
 MAX_PATH_WIDTH = 2
@@ -25,18 +26,17 @@ class InteractivePredictor:
         with open(input_filename, 'r') as file:
             return file.readlines()
 
-    def predict(self):
-        input_filename = 'Input.java'
+    def predict(self, inputType, inputPath):
         print('Starting interactive prediction...')
         while True:
             print(
-                'Modify the file: "%s" and press any key when ready, or "q" / "quit" / "exit" to exit' % input_filename)
+                'Modify the file: "%s" and press any key when ready, or "q" / "quit" / "exit" to exit' % inputPath)
             user_input = input()
             if user_input.lower() in self.exit_keywords:
                 print('Exiting...')
                 return
             try:
-                predict_lines, hash_to_string_dict = self.path_extractor.extract_paths(input_filename)
+                predict_lines, hash_to_string_dict = self.path_extractor.extract_paths(inputType, inputPath)
             except ValueError as e:
                 print(e)
                 continue
@@ -55,3 +55,21 @@ class InteractivePredictor:
                 if self.config.EXPORT_CODE_VECTORS:
                     print('Code vector:')
                     print(' '.join(map(str, raw_prediction.code_vector)))
+
+    def extractRepresentation(self, inputType, inputPath):
+        print('Starting code2vec representation extraction...')
+        while True:
+            print(
+                'Modify the file: "%s" and press any key when ready, or "q" / "quit" / "exit" to exit' % inputPath)
+            user_input = input()
+            if user_input.lower() in self.exit_keywords:
+                print('Exiting...')
+                return
+            try:
+                predict_lines, hash_to_string_dict = self.path_extractor.extract_paths(inputType, inputPath)
+            except ValueError as e:
+                print(e)
+                continue
+
+            self.model.extractCode2Vec(predict_lines)
+

@@ -35,7 +35,7 @@ public final class Common {
 
 	public static String normalizeName(String original, String defaultString) {
 		original = original.toLowerCase().replaceAll("\\\\n", "") // escaped new
-																	// lines
+				// lines
 				.replaceAll("//s+", "") // whitespaces
 				.replaceAll("[\"',]", "") // quotes, apostrophies, commas
 				.replaceAll("\\P{Print}", ""); // unicode weird characters

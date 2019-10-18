@@ -4,6 +4,7 @@ import time
 from typing import Dict, Optional, List, Iterable
 from collections import Counter
 from functools import partial
+import os
 
 from path_context_reader import PathContextReader, ModelInputTensorsFormer, ReaderInputTensors, EstimatorAction
 from common import common
@@ -122,7 +123,7 @@ class Code2VecModel(Code2VecModelBase):
             input_tensors = input_iterator.get_next()
 
             self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
-                self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
+            self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
             self.saver = tf.compat.v1.train.Saver()
 
         if self.config.MODEL_LOAD_PATH and not self.config.TRAIN_DATA_PATH_PREFIX:
@@ -184,7 +185,7 @@ class Code2VecModel(Code2VecModelBase):
             log_output_file.write(str(topk_accuracy_evaluation_metric.topk_correct_predictions) + '\n')
         if self.config.EXPORT_CODE_VECTORS:
             code_vectors_file.close()
-        
+
         elapsed = int(time.time() - eval_start_time)
         self.log("Evaluation time: %sH:%sM:%sS" % ((elapsed // 60 // 60), (elapsed // 60) % 60, elapsed % 60))
         return ModelEvaluationResults(
@@ -326,12 +327,12 @@ class Code2VecModel(Code2VecModelBase):
 
         prediction_results: List[ModelPredictionResults] = []
         for line in predict_data_lines:
-            batch_top_words, batch_top_scores, batch_original_name, batch_attention_weights, batch_path_source_strings,\
-                batch_path_strings, batch_path_target_strings, batch_code_vectors = self.sess.run(
-                    [self.predict_top_words_op, self.predict_top_values_op, self.predict_original_names_op,
-                     self.attention_weights_op, self.predict_source_string, self.predict_path_string,
-                     self.predict_path_target_string, self.predict_code_vectors],
-                    feed_dict={self.predict_placeholder: line})
+            batch_top_words, batch_top_scores, batch_original_name, batch_attention_weights, batch_path_source_strings, \
+            batch_path_strings, batch_path_target_strings, batch_code_vectors = self.sess.run(
+                [self.predict_top_words_op, self.predict_top_values_op, self.predict_original_names_op,
+                 self.attention_weights_op, self.predict_source_string, self.predict_path_string,
+                 self.predict_path_target_string, self.predict_code_vectors],
+                feed_dict={self.predict_placeholder: line})
             # shapes:
             #   batch_top_words, top_scores: (batch, top_k)
             #   batch_original_name: (batch, )
@@ -365,6 +366,48 @@ class Code2VecModel(Code2VecModelBase):
                 code_vector=(code_vectors if self.config.EXPORT_CODE_VECTORS else None)
             ))
         return prediction_results
+
+    def extractCode2Vec(self, predict_data_lines: Iterable[str]):
+        if self.predict_reader is None:
+            self.predict_reader = PathContextReader(vocabs=self.vocabs,
+                                                    model_input_tensors_former=_TFEvaluateModelInputTensorsFormer(),
+                                                    config=self.config,
+                                                    estimator_action=EstimatorAction.Predict)
+            self.predict_placeholder = tf.compat.v1.placeholder(tf.string)
+            reader_output = self.predict_reader.process_input_row(self.predict_placeholder)
+
+            self.predict_top_words_op, self.predict_top_values_op, self.predict_original_names_op, \
+            self.attention_weights_op, self.predict_source_string, self.predict_path_string, \
+            self.predict_path_target_string, self.predict_code_vectors = \
+                self._build_tf_test_graph(reader_output, normalize_scores=True)
+
+            self._initialize_session_variables()
+            self.saver = tf.compat.v1.train.Saver()
+            self._load_inner_model(sess=self.sess)
+
+
+        fileDir = os.path.dirname(os.path.realpath('../result'))
+        file = open(os.path.join(fileDir, "result/codevectors_labeled.txt"), "a")
+        print("Extracting code vectors.")
+        currentPercent = 0
+        amountDataLines = len(predict_data_lines)
+
+        for id, line in enumerate(predict_data_lines):
+            if id > 0 and id / amountDataLines > currentPercent:
+                print("extracted code vectors for", str(round(currentPercent, 2)) + " percent of", amountDataLines, "methods.")
+                currentPercent += 0.05
+
+            batch_original_name, batch_code_vectors = self.sess.run(
+                [self.predict_original_names_op, self.predict_code_vectors],
+                feed_dict={self.predict_placeholder: line})
+            code_vectors = np.squeeze(batch_code_vectors, axis=0)
+
+            methodName, paddingf, methodId, methodLabel = np.array2string(batch_original_name).split('|')
+            output = methodName[3:] + methodId + '\n' + methodLabel[0] + '\n' + np.array2string(code_vectors) + '\n'
+            file.write(output)
+
+        file.close()
+        print('Finished extracting code vectors.')
 
     def _save_inner_model(self, path: str):
         self.saver.save(self.sess, path)
