@@ -77,7 +77,7 @@ class Extractor:
             result = []
             hash_to_string_dict = {}
             for (dirpath, dirnames, filenames) in os.walk(path):
-                print("Processing all java files at", dirpath, '.')
+                # print("Processing all java files at", dirpath, '.')
                 for filename in filenames:
                     startTime = time.time()
                     filepath = os.path.normpath(dirpath + '/' + filename)
@@ -85,10 +85,10 @@ class Extractor:
                         result, hash_to_string_dict = self.extract_java(dirpath + '/' + filename, hash_to_string_dict, result)
                         endTime = time.time()
                         executionTime = endTime - startTime
-                        print("Processing", filename, 'at', dirpath, 'took', round(executionTime, 3), 'seconds.')
-                    else:
-                        print("Incorrect filepath:", filepath)
-                print("Processed all java files at", dirpath, '.')
+                        # print("Processing", filename, 'at', dirpath, 'took', round(executionTime, 3), 'seconds.')
+                    # else:
+                    #     print("Incorrect filepath:", filepath)
+                # print("Processed all java files at", dirpath, '.')
             return result, hash_to_string_dict
         elif inputType == '--file':
             return self.extract_java(path, {}, [])

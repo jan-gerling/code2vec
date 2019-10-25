@@ -1,6 +1,6 @@
 import re
 import numpy as np
-import tensorflow as tf
+# import tensorflow as tf
 from itertools import takewhile, repeat
 from typing import List, Optional, Tuple, Iterable
 from datetime import datetime
@@ -157,11 +157,11 @@ class common:
             prediction_results.append(current_method_prediction_results)
         return prediction_results
 
-    @staticmethod
-    def tf_get_first_true(bool_tensor: tf.Tensor) -> tf.Tensor:
-        bool_tensor_as_int32 = tf.cast(bool_tensor, dtype=tf.int32)
-        cumsum = tf.cumsum(bool_tensor_as_int32, axis=-1, exclusive=False)
-        return tf.logical_and(tf.equal(cumsum, 1), bool_tensor)
+    # @staticmethod
+    # def tf_get_first_true(bool_tensor: tf.Tensor) -> tf.Tensor:
+    #     bool_tensor_as_int32 = tf.cast(bool_tensor, dtype=tf.int32)
+    #     cumsum = tf.cumsum(bool_tensor_as_int32, axis=-1, exclusive=False)
+    #     return tf.logical_and(tf.equal(cumsum, 1), bool_tensor)
 
     @staticmethod
     def count_lines_in_file(file_path: str):
@@ -169,13 +169,13 @@ class common:
             bufgen = takewhile(lambda x: x, (f.raw.read(1024 * 1024) for _ in repeat(None)))
             return sum(buf.count(b'\n') for buf in bufgen)
 
-    @staticmethod
-    def squeeze_single_batch_dimension_for_np_arrays(arrays):
-        assert all(array is None or isinstance(array, np.ndarray) or isinstance(array, tf.Tensor) for array in arrays)
-        return tuple(
-            None if array is None else np.squeeze(array, axis=0)
-            for array in arrays
-        )
+    # @staticmethod
+    # def squeeze_single_batch_dimension_for_np_arrays(arrays):
+    #     assert all(array is None or isinstance(array, np.ndarray) or isinstance(array, tf.Tensor) for array in arrays)
+    #     return tuple(
+    #         None if array is None else np.squeeze(array, axis=0)
+    #         for array in arrays
+    #     )
 
     @staticmethod
     def get_first_match_word_from_top_predictions(special_words, original_name, top_predicted_words) -> Optional[Tuple[int, str]]:

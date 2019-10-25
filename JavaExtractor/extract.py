@@ -10,7 +10,7 @@ from threading import Timer
 import sys
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE, STDOUT, call
-
+from py4j.java_gateway import JavaGateway, GatewayParameters
 
 
 def get_immediate_subdirectories(a_dir):
@@ -20,42 +20,68 @@ def get_immediate_subdirectories(a_dir):
 
 TMP_DIR = ""
 
+def validateInput(path):
+    failingFiles = []
+    for (dirpath, dirnames, filenames) in os.walk(path):
+        # print("Validating input at:", dirpath)
+        for filename in filenames:
+            filepath = os.path.normpath(dirpath + '/' + filename)
+            if os.path.isfile(filepath):
+                currentResult = True
+                gateway = JavaGateway(gateway_parameters=GatewayParameters(port=25335))
+                syntaxChecker = gateway.entry_point
+                f = open(filepath, "r", encoding="utf8")
+
+                currentFile = True
+                while currentFile:
+                    line1 = f.readline()
+                    line2 = f.readline()
+                    currentFile = line2 and line1
+                    if len(line1) > 1 and len(line2) > 1:
+                        if not syntaxChecker.validSyntax(line1 + line2):
+                            currentResult = False
+                gateway.close()
+                f.close()
+                if not currentResult:
+                    failingFiles.append(filename)
+
+    if len(failingFiles) > 0:
+        print("Input validation failed for:", failingFiles)
+    return failingFiles
+
 def ParallelExtractDir(args, dir):
     ExtractFeaturesForDir(args, dir, "")
 
+def extract_java(path, max_path_length, max_path_width):
+    gateway = JavaGateway(gateway_parameters=GatewayParameters(port=25335))
+    javaextractor = gateway.entry_point
+
+    f = open(path, "r", encoding="utf8")
+    code = f.read()
+    f.close()
+
+    return javaextractor.extractCode(int(max_path_length), int(max_path_width), code)
 
 def ExtractFeaturesForDir(args, dir, prefix):
-    command = ['java', '-cp', args.jar, 'JavaExtractor.App',
-               '--max_path_length', str(args.max_path_length), '--max_path_width', str(args.max_path_width),
-               '--dir', dir, '--num_threads', str(args.num_threads)]
+    # command = ['java', '-cp', args.jar, 'JavaExtractor.App',
+    #            '--max_path_length', str(args.max_path_length), '--max_path_width', str(args.max_path_width),
+    #            '--dir', dir, '--num_threads', str(args.num_threads)]
+    failingFiles = validateInput(dir)
+    if len(failingFiles) > 0:
+        raise ValueError("Input validation failed for:", failingFiles)
 
-    # print command
-    # os.system(command)
-    kill = lambda process: process.kill()
     outputFileName = TMP_DIR + prefix + dir.split('/')[-1]
-    failed = False
     with open(outputFileName, 'a') as outputFile:
-        sleeper = subprocess.Popen(command, stdout=outputFile, stderr=subprocess.PIPE)
-        timer = Timer(600000, kill, [sleeper])
-
-        try:
-            timer.start()
-            stdout, stderr = sleeper.communicate()
-        finally:
-            timer.cancel()
-
-        if sleeper.poll() == 0:
-            if len(stderr) > 0:
-                print(sys.stderr, stderr, file=sys.stdout)
-        else:
-            print(sys.stderr, 'dir: ' + str(dir) + ' was not completed in time', file=sys.stdout)
-            failed = True
-            subdirs = get_immediate_subdirectories(dir)
-            for subdir in subdirs:
-                ExtractFeaturesForDir(args, subdir, prefix + dir.split('/')[-1] + '_')
-    if failed:
-        if os.path.exists(outputFileName):
-            os.remove(outputFileName)
+        for (dirpath, dirnames, filenames) in os.walk(dir):
+            # print("Processing all java files at", dirpath, '.')
+            for filename in filenames:
+                filepath = os.path.normpath(dirpath + '/' + filename)
+                if os.path.isfile(filepath):
+                    out = extract_java(dirpath + '/' + filename, args.max_path_length, args.max_path_width)
+                    outputFile.write(out)
+                # else:
+                #     print("Incorrect filepath:", filepath)
+            # print("Processed all java files at", dirpath, '.')
 
 
 def ExtractFeaturesForDirsList(args, dirs):
@@ -65,7 +91,7 @@ def ExtractFeaturesForDirsList(args, dirs):
         shutil.rmtree(TMP_DIR, ignore_errors=True)
     os.makedirs(TMP_DIR)
     try:
-        p = multiprocessing.Pool(4)
+        p = multiprocessing.Pool(1)
         p.starmap(ParallelExtractDir, zip(itertools.repeat(args), dirs))
         #for dir in dirs:
         #    ExtractFeaturesForDir(args, dir, '')
